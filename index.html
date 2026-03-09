@@ -3,1289 +3,551 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#050508">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>InterviewAI — Real-Time Assistant</title>
-<link rel="manifest" href="manifest.json">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<title>InterviewAI</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #07070d;
-    --surface: #0f0f1a;
-    --surface2: #161625;
-    --border: rgba(255,255,255,0.07);
-    --accent: #00ff88;
-    --accent2: #7b61ff;
-    --accent3: #ff6b35;
-    --text: #f0f0f8;
-    --muted: #6b6b8a;
-    --danger: #ff4466;
-    --mono: 'Space Mono', monospace;
-    --sans: 'Syne', sans-serif;
-  }
-
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    overflow: hidden;
-  }
-
-  /* === NOISE OVERLAY === */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  #app {
-    position: relative;
-    z-index: 1;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* === HEADER === */
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 18px 10px;
-    border-bottom: 1px solid var(--border);
-    background: rgba(7,7,13,0.95);
-    backdrop-filter: blur(20px);
-    flex-shrink: 0;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .logo-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 10px var(--accent);
-    animation: pulse-dot 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.7); }
-  }
-
-  .logo-text {
-    font-family: var(--sans);
-    font-weight: 800;
-    font-size: 15px;
-    letter-spacing: 0.05em;
-    color: var(--text);
-  }
-
-  .logo-text span {
-    color: var(--accent);
-  }
-
-  .header-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .status-badge {
-    font-family: var(--mono);
-    font-size: 9px;
-    padding: 3px 8px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition: all 0.3s;
-  }
-
-  .status-badge.listening {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(0,255,136,0.08);
-    box-shadow: 0 0 12px rgba(0,255,136,0.2);
-  }
-
-  .status-badge.thinking {
-    border-color: var(--accent2);
-    color: var(--accent2);
-    background: rgba(123,97,255,0.08);
-    animation: thinking-pulse 1s ease-in-out infinite;
-  }
-
-  @keyframes thinking-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  .btn-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .btn-icon:active { transform: scale(0.92); }
-  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
-
-  /* === JOB CONTEXT SETUP === */
-  .setup-panel {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    background: var(--surface);
-  }
-
-  .setup-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-
-  .setup-row {
-    display: flex;
-    gap: 8px;
-  }
-
-  .setup-input {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-family: var(--sans);
-    font-size: 13px;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .setup-input:focus {
-    border-color: var(--accent2);
-  }
-
-  .setup-input::placeholder { color: var(--muted); }
-
-  .btn-save {
-    padding: 8px 14px;
-    background: var(--accent2);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-family: var(--sans);
-    font-weight: 600;
-    font-size: 12px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .btn-save:active { transform: scale(0.95); opacity: 0.8; }
-
-  /* === WAVEFORM VISUALIZER === */
-  .waveform-bar {
-    padding: 12px 18px 8px;
-    flex-shrink: 0;
-  }
-
-  .waveform {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    height: 32px;
-    opacity: 0.3;
-    transition: opacity 0.3s;
-  }
-
-  .waveform.active { opacity: 1; }
-
-  .wave-bar {
-    flex: 1;
-    background: var(--accent);
-    border-radius: 2px;
-    height: 4px;
-    transition: height 0.1s ease;
-  }
-
-  /* === TRANSCRIPT AREA === */
-  .transcript-section {
-    padding: 0 18px 8px;
-    flex-shrink: 0;
-  }
-
-  .section-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  .transcript-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text);
-    min-height: 44px;
-    max-height: 72px;
-    overflow-y: auto;
-    line-height: 1.5;
-    position: relative;
-  }
-
-  .transcript-placeholder {
-    color: var(--muted);
-    font-style: italic;
-  }
-
-  .transcript-live {
-    color: var(--text);
-  }
-
-  .transcript-live .cursor {
-    display: inline-block;
-    width: 2px;
-    height: 12px;
-    background: var(--accent);
-    vertical-align: middle;
-    margin-left: 2px;
-    animation: blink 0.8s step-end infinite;
-  }
-
-  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-
-  /* === ANSWER AREA === */
-  .answer-section {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    padding: 0 18px 14px;
-  }
-
-  .answer-box {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow-y: auto;
-    padding: 14px;
-    position: relative;
-  }
-
-  .answer-empty {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    color: var(--muted);
-  }
-
-  .answer-empty .big-icon {
-    font-size: 36px;
-    opacity: 0.3;
-  }
-
-  .answer-empty p {
-    font-family: var(--mono);
-    font-size: 11px;
-    text-align: center;
-    line-height: 1.6;
-    max-width: 220px;
-  }
-
-  /* === ANSWER CONTENT === */
-  .answer-content {
-    display: none;
-    animation: fade-up 0.4s ease forwards;
-  }
-
-  .answer-content.visible { display: block; }
-
-  @keyframes fade-up {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .answer-question {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--accent3);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .answer-main {
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--text);
-    margin-bottom: 14px;
-  }
-
-  .answer-main p { margin-bottom: 8px; }
-  .answer-main p:last-child { margin-bottom: 0; }
-
-  /* === CODE BLOCK === */
-  .code-block {
-    background: #0a0a14;
-    border: 1px solid rgba(123,97,255,0.3);
-    border-radius: 8px;
-    padding: 12px;
-    margin: 10px 0;
-    overflow-x: auto;
-    position: relative;
-  }
-
-  .code-block-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--accent2);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .code-block pre {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: #c9d1d9;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.6;
-  }
-
-  .code-copy-btn {
-    background: rgba(123,97,255,0.2);
-    border: 1px solid rgba(123,97,255,0.3);
-    color: var(--accent2);
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-family: var(--mono);
-    font-size: 9px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .code-copy-btn:active { transform: scale(0.95); }
-
-  /* === FOLLOW-UPS === */
-  .followups-section {
-    margin-top: 12px;
-  }
-
-  .followups-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-
-  .followup-chip {
-    display: inline-block;
-    background: rgba(0,255,136,0.06);
-    border: 1px solid rgba(0,255,136,0.2);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 11px;
-    color: var(--accent);
-    margin: 3px 3px 3px 0;
-    cursor: pointer;
-    transition: all 0.2s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .followup-chip:active {
-    background: rgba(0,255,136,0.15);
-    transform: scale(0.97);
-  }
-
-  /* === THINKING SKELETON === */
-  .skeleton-wrap {
-    display: none;
-    padding: 4px 0;
-  }
-
-  .skeleton-wrap.visible { display: block; }
-
-  .skeleton-line {
-    height: 12px;
-    background: linear-gradient(90deg, var(--surface2) 25%, rgba(123,97,255,0.1) 50%, var(--surface2) 75%);
-    background-size: 200% 100%;
-    border-radius: 6px;
-    margin-bottom: 8px;
-    animation: shimmer 1.5s infinite;
-  }
-
-  .skeleton-line:nth-child(2) { width: 85%; animation-delay: 0.1s; }
-  .skeleton-line:nth-child(3) { width: 70%; animation-delay: 0.2s; }
-  .skeleton-line:nth-child(4) { width: 90%; animation-delay: 0.3s; }
-  .skeleton-line:nth-child(5) { width: 60%; animation-delay: 0.4s; }
-
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-
-  /* === MIC BUTTON === */
-  .mic-container {
-    padding: 10px 18px 18px;
-    flex-shrink: 0;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-
-  .mic-btn {
-    flex: 1;
-    height: 52px;
-    border-radius: 14px;
-    border: none;
-    font-family: var(--sans);
-    font-weight: 700;
-    font-size: 14px;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.25s;
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .mic-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(255,255,255,0.05);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .mic-btn:active::before { opacity: 1; }
-
-  .mic-btn.idle {
-    background: var(--accent);
-    color: #000;
-    box-shadow: 0 4px 20px rgba(0,255,136,0.3);
-  }
-
-  .mic-btn.idle:active { transform: scale(0.97); }
-
-  .mic-btn.recording {
-    background: var(--danger);
-    color: #fff;
-    box-shadow: 0 4px 20px rgba(255,68,102,0.4);
-    animation: record-pulse 1.5s ease-in-out infinite;
-  }
-
-  @keyframes record-pulse {
-    0%, 100% { box-shadow: 0 4px 20px rgba(255,68,102,0.4); }
-    50% { box-shadow: 0 4px 35px rgba(255,68,102,0.7); }
-  }
-
-  .mic-icon { font-size: 18px; }
-
-  .clear-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    -webkit-tap-highlight-color: transparent;
-    flex-shrink: 0;
-  }
-
-  .clear-btn:active { transform: scale(0.95); color: var(--danger); border-color: var(--danger); }
-
-  /* === SETTINGS PANEL === */
-  .settings-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(8px);
-    z-index: 100;
-    display: none;
-    align-items: flex-end;
-    justify-content: center;
-  }
-
-  .settings-overlay.open { display: flex; }
-
-  .settings-sheet {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 20px 20px 0 0;
-    padding: 20px 20px 36px;
-    width: 100%;
-    max-width: 480px;
-    animation: slide-up 0.3s ease;
-  }
-
-  @keyframes slide-up {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-
-  .settings-handle {
-    width: 36px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    margin: 0 auto 18px;
-  }
-
-  .settings-title {
-    font-weight: 800;
-    font-size: 18px;
-    margin-bottom: 18px;
-  }
-
-  .setting-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .setting-row:last-child { border-bottom: none; }
-
-  .setting-info label {
-    font-weight: 600;
-    font-size: 14px;
-    display: block;
-    margin-bottom: 2px;
-  }
-
-  .setting-info small {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-  }
-
-  .toggle {
-    width: 44px;
-    height: 24px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    position: relative;
-    cursor: pointer;
-    transition: background 0.3s;
-    flex-shrink: 0;
-  }
-
-  .toggle.on { background: var(--accent); border-color: var(--accent); }
-
-  .toggle::after {
-    content: '';
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: white;
-    top: 2px;
-    left: 2px;
-    transition: transform 0.3s;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-  }
-
-  .toggle.on::after { transform: translateX(20px); }
-
-  .select-field {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 13px;
-    outline: none;
-  }
-
-  /* === TOAST === */
-  .toast {
-    position: fixed;
-    bottom: 100px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 8px 18px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text);
-    opacity: 0;
-    transition: all 0.3s;
-    z-index: 200;
-    white-space: nowrap;
-  }
-
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#050508;--s1:#0c0c14;--s2:#12121e;--s3:#1a1a2a;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --g:#00e87a;--g2:#00c264;--p:#6c63ff;--p2:#9b94ff;
+  --o:#ff7043;--r:#ff4466;
+  --text:#eeeef8;--text2:#a0a0c0;--text3:#5a5a7a;
+  --mono:'DM Mono',monospace;--ui:'Outfit',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);overflow:hidden;-webkit-font-smoothing:antialiased}
+
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);animation:drift 9s ease-in-out infinite}
+.orb.a{width:280px;height:280px;background:var(--p);opacity:0.1;top:-80px;right:-40px}
+.orb.b{width:220px;height:220px;background:var(--g);opacity:0.09;bottom:80px;left:-70px;animation-delay:-4s}
+.orb.c{width:140px;height:140px;background:var(--o);opacity:0.06;bottom:260px;right:10px;animation-delay:-7s}
+@keyframes drift{0%,100%{transform:translate(0,0)}40%{transform:translate(18px,-18px)}70%{transform:translate(-12px,14px)}}
+
+#app{position:relative;z-index:1;height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:15px 20px 13px;background:rgba(5,5,8,0.85);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-ico{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--g),var(--p));display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 4px 16px rgba(0,232,122,0.28)}
+.logo-txt{font-weight:800;font-size:17px;letter-spacing:-0.02em}
+.logo-txt em{font-style:normal;background:linear-gradient(90deg,var(--g),var(--p2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr-r{display:flex;align-items:center;gap:8px}
+
+.pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:var(--s2);border:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;transition:all 0.4s ease}
+.pill.on{background:rgba(0,232,122,0.08);border-color:rgba(0,232,122,0.3);color:var(--g);box-shadow:0 0 20px rgba(0,232,122,0.1)}
+.pill.thinking{background:rgba(108,99,255,0.08);border-color:rgba(108,99,255,0.3);color:var(--p2)}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.pill.on .pill-dot{animation:ping 1.2s ease-in-out infinite}
+.pill.thinking .pill-dot{animation:spin 0.7s linear infinite}
+@keyframes ping{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:0.5}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.ico-btn{width:34px;height:34px;border-radius:10px;background:var(--s2);border:1px solid var(--border);color:var(--text3);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s}
+.ico-btn:active{transform:scale(0.88)}
+
+/* CONTEXT */
+.ctx{padding:11px 20px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(5,5,8,0.5)}
+.lbl{font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:7px}
+.ctx-row{display:flex;gap:8px}
+.ctx-in{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:8px 13px;font-family:var(--ui);font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s}
+.ctx-in:focus{border-color:rgba(108,99,255,0.5);box-shadow:0 0 0 3px rgba(108,99,255,0.07)}
+.ctx-in::placeholder{color:var(--text3)}
+.set-btn{padding:8px 15px;background:linear-gradient(135deg,var(--p),#4f46e5);color:#fff;border:none;border-radius:10px;font-family:var(--ui);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;transition:all 0.2s;box-shadow:0 4px 14px rgba(108,99,255,0.28)}
+.set-btn:active{transform:scale(0.95)}
+
+/* WAVE */
+.wave-wrap{padding:9px 20px 5px;flex-shrink:0}
+.wave{display:flex;align-items:center;gap:2.5px;height:26px}
+.wb{flex:1;border-radius:2px;background:linear-gradient(to top,var(--g2),var(--g));height:3px;opacity:0.2;transition:height 0.08s ease,opacity 0.3s}
+.wave.live .wb{opacity:1}
+
+/* TRANSCRIPT */
+.tx-wrap{padding:0 20px 9px;flex-shrink:0}
+.sec-lbl{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.tx-box{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:10px 14px;min-height:44px;max-height:68px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;line-height:1.6;color:var(--text2)}
+.tx-ph{color:var(--text3);font-style:italic}
+#txLive{display:none}
+.cur{display:inline-block;width:2px;height:11px;background:var(--g);vertical-align:middle;margin-left:2px;border-radius:1px;animation:blink 0.75s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ANSWER */
+.ans-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:0 20px 10px}
+.ans-box{flex:1;overflow-y:auto;background:var(--s1);border:1px solid var(--border);border-radius:16px;position:relative}
+
+.ans-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;padding:20px}
+.empty-ico{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,rgba(0,232,122,0.08),rgba(108,99,255,0.08));border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px}
+.empty-t{font-weight:700;font-size:14px;color:var(--text2)}
+.empty-s{font-size:12px;color:var(--text3);text-align:center;line-height:1.6;max-width:200px}
+
+/* skeleton */
+.skel{display:none;padding:16px}
+.skel.show{display:block}
+.sk-hdr{height:10px;width:130px;background:var(--s3);border-radius:6px;margin-bottom:14px;animation:sk 1.5s ease-in-out infinite}
+.sk-ln{height:11px;background:var(--s3);border-radius:6px;margin-bottom:8px;animation:sk 1.5s ease-in-out infinite}
+.sk-ln:nth-child(2){width:95%}.sk-ln:nth-child(3){width:80%;animation-delay:.1s}.sk-ln:nth-child(4){width:90%;animation-delay:.2s}.sk-ln:nth-child(5){width:72%;animation-delay:.3s}.sk-ln:nth-child(6){width:86%;animation-delay:.4s}
+@keyframes sk{0%,100%{opacity:0.35}50%{opacity:0.75}}
+
+/* answer content */
+.ans-cont{display:none;padding:16px}
+.ans-cont.show{display:block;animation:rise 0.45s cubic-bezier(0.22,1,0.36,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.ans-q-tag{display:flex;align-items:flex-start;gap:8px;background:rgba(255,112,67,0.07);border:1px solid rgba(255,112,67,0.18);border-radius:10px;padding:8px 12px;margin-bottom:14px}
+.ans-q-ico{font-size:12px;flex-shrink:0;margin-top:1px}
+.ans-q-txt{font-family:var(--mono);font-size:10px;color:var(--o);line-height:1.55;letter-spacing:0.02em}
+
+.ans-body{font-size:13.5px;line-height:1.78;color:var(--text);margin-bottom:12px}
+.ans-body p{margin-bottom:9px}.ans-body p:last-child{margin-bottom:0}
+.ans-body strong{color:#fff;font-weight:600}
+
+.code-blk{background:#07070f;border:1px solid rgba(108,99,255,0.22);border-radius:12px;margin:11px 0;overflow:hidden}
+.code-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 13px;border-bottom:1px solid rgba(108,99,255,0.13);background:rgba(108,99,255,0.05)}
+.code-lang{font-family:var(--mono);font-size:9px;color:var(--p2);letter-spacing:0.1em;text-transform:uppercase}
+.code-copy{background:rgba(108,99,255,0.14);border:1px solid rgba(108,99,255,0.24);color:var(--p2);border-radius:6px;padding:3px 10px;font-family:var(--mono);font-size:9px;cursor:pointer;transition:all 0.2s;letter-spacing:.05em}
+.code-copy:active{background:rgba(108,99,255,0.28);transform:scale(0.94)}
+.code-blk pre{padding:13px;font-family:var(--mono);font-size:11.5px;color:#c9d1d9;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+
+.fu-sec{margin-top:14px}
+.fu-lbl{font-family:var(--mono);font-size:9px;color:var(--g);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.fu-dot{width:6px;height:6px;border-radius:50%;background:var(--g);box-shadow:0 0 7px var(--g);flex-shrink:0}
+.fu-chips{display:flex;flex-wrap:wrap;gap:6px}
+.fu-chip{background:rgba(0,232,122,0.05);border:1px solid rgba(0,232,122,0.18);border-radius:20px;padding:6px 13px;font-size:11.5px;color:var(--g);cursor:pointer;transition:all 0.2s;line-height:1.3}
+.fu-chip:active{background:rgba(0,232,122,0.14);transform:scale(0.96)}
+
+/* MANUAL ROW */
+.man-row{padding:0 20px 9px;flex-shrink:0;display:flex;gap:8px}
+.man-in{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:9px 13px;font-family:var(--ui);font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s}
+.man-in:focus{border-color:rgba(0,232,122,0.35)}
+.man-in::placeholder{color:var(--text3)}
+.man-send{width:44px;height:44px;background:var(--g);border:none;border-radius:12px;color:#003320;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all 0.2s;box-shadow:0 4px 14px rgba(0,232,122,0.28)}
+.man-send:active{transform:scale(0.92)}
+
+/* MIC */
+.mic-area{padding:8px 20px 20px;flex-shrink:0;display:flex;gap:10px;align-items:center}
+.mic-btn{flex:1;height:56px;border:none;border-radius:16px;font-family:var(--ui);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);position:relative;overflow:hidden}
+.mic-btn:active{transform:scale(0.96)}
+.mic-btn.idle{background:linear-gradient(135deg,var(--g),var(--g2));color:#003320;box-shadow:0 6px 24px rgba(0,232,122,0.32),0 2px 8px rgba(0,0,0,0.25)}
+.mic-btn.rec{background:linear-gradient(135deg,#ff4466,#cc1133);color:#fff;box-shadow:0 6px 24px rgba(255,68,102,0.42);animation:rec-pulse 1.8s ease-in-out infinite}
+@keyframes rec-pulse{0%,100%{box-shadow:0 6px 24px rgba(255,68,102,0.42)}50%{box-shadow:0 6px 38px rgba(255,68,102,0.68)}}
+.mic-btn.busy{background:linear-gradient(135deg,var(--p),#4f46e5);color:#fff;box-shadow:0 6px 24px rgba(108,99,255,0.38);pointer-events:none}
+.mic-ico{font-size:20px}
+
+.clr-btn{width:56px;height:56px;border-radius:16px;background:var(--s2);border:1px solid var(--border);color:var(--text3);font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+.clr-btn:active{transform:scale(0.92);color:var(--r);border-color:rgba(255,68,102,0.38)}
+
+/* SETTINGS */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.sheet{background:var(--s1);border:1px solid var(--border2);border-bottom:none;border-radius:24px 24px 0 0;padding:16px 20px 38px;width:100%;max-width:480px;animation:sheet-up 0.32s cubic-bezier(0.22,1,0.36,1)}
+@keyframes sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sh-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px}
+.sh-title{font-weight:800;font-size:20px;margin-bottom:16px;letter-spacing:-0.02em}
+.s-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.s-row:last-of-type{border-bottom:none}
+.s-info label{font-weight:600;font-size:14px;display:block;margin-bottom:2px}
+.s-info small{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.tog{width:46px;height:26px;background:var(--s3);border:1px solid var(--border2);border-radius:13px;position:relative;cursor:pointer;transition:all 0.3s;flex-shrink:0}
+.tog.on{background:var(--g);border-color:var(--g);box-shadow:0 0 14px rgba(0,232,122,0.25)}
+.tog::after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+.tog.on::after{transform:translateX(20px)}
+.sel{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:7px 11px;color:var(--text);font-family:var(--ui);font-size:13px;outline:none}
+.done-btn{width:100%;height:48px;margin-top:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--g),var(--g2));color:#003320;font-family:var(--ui);font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 6px 20px rgba(0,232,122,0.28)}
+.done-btn:active{transform:scale(0.97)}
+
+/* TOAST */
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--s2);border:1px solid var(--border2);border-radius:24px;padding:9px 20px;font-family:var(--mono);font-size:11px;color:var(--text);opacity:0;transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);z-index:200;pointer-events:none;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 </style>
 </head>
 <body>
+<div class="ambient"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
 
 <div id="app">
-
   <!-- HEADER -->
-  <div class="header">
+  <div class="hdr">
     <div class="logo">
-      <div class="logo-dot" id="statusDot"></div>
-      <div class="logo-text">Interview<span>AI</span></div>
+      <div class="logo-ico">🎯</div>
+      <div class="logo-txt">Interview<em>AI</em></div>
     </div>
-    <div class="header-controls">
-      <div class="status-badge" id="statusBadge">READY</div>
-      <div class="btn-icon" id="settingsBtn" title="Settings">⚙️</div>
+    <div class="hdr-r">
+      <div class="pill" id="pill"><div class="pill-dot"></div><span id="pillTxt">Ready</span></div>
+      <div class="ico-btn" id="settingsBtn">⚙️</div>
     </div>
   </div>
 
-  <!-- JOB CONTEXT -->
-  <div class="setup-panel">
-    <div class="setup-label">Job / Role Context</div>
-    <div class="setup-row">
-      <input class="setup-input" id="jobContext" type="text"
-        placeholder="e.g. Senior React Developer at Google…" />
-      <button class="btn-save" id="saveContext">Set</button>
+  <!-- CONTEXT -->
+  <div class="ctx">
+    <div class="lbl">Job / Role Context</div>
+    <div class="ctx-row">
+      <input class="ctx-in" id="jobIn" type="text" placeholder="e.g. Senior React Dev at Google…" autocomplete="off"/>
+      <button class="set-btn" id="saveCtx">Set</button>
     </div>
   </div>
 
   <!-- WAVEFORM -->
-  <div class="waveform-bar">
-    <div class="waveform" id="waveform">
-      <!-- Bars generated by JS -->
-    </div>
-  </div>
+  <div class="wave-wrap"><div class="wave" id="waveEl"></div></div>
 
   <!-- TRANSCRIPT -->
-  <div class="transcript-section">
-    <div class="section-label">Interviewer is saying</div>
-    <div class="transcript-box" id="transcriptBox">
-      <span class="transcript-placeholder" id="transcriptPlaceholder">
-        Tap the mic button below and start listening…
-      </span>
-      <span class="transcript-live" id="transcriptLive" style="display:none;"></span>
+  <div class="tx-wrap">
+    <div class="sec-lbl">Hearing</div>
+    <div class="tx-box" id="txBox">
+      <span class="tx-ph" id="txPh">Start the mic — I'll transcribe in real-time…</span>
+      <span id="txLive"></span>
     </div>
   </div>
 
   <!-- ANSWER -->
-  <div class="answer-section">
-    <div class="section-label">Your Answer</div>
-    <div class="answer-box" id="answerBox">
-
-      <div class="answer-empty" id="answerEmpty">
-        <div class="big-icon">🎯</div>
-        <p>Answers appear here instantly<br>as questions are detected</p>
+  <div class="ans-wrap">
+    <div class="sec-lbl">Your Answer</div>
+    <div class="ans-box" id="ansBox">
+      <div class="ans-empty" id="ansEmpty">
+        <div class="empty-ico">✨</div>
+        <div class="empty-t">Answers appear here instantly</div>
+        <div class="empty-s">Tap mic, let it hear the question — AI answers in seconds</div>
       </div>
-
-      <!-- Skeleton loading -->
-      <div class="skeleton-wrap" id="skeletonWrap">
-        <div class="skeleton-line"></div>
-        <div class="skeleton-line"></div>
-        <div class="skeleton-line"></div>
-        <div class="skeleton-line"></div>
-        <div class="skeleton-line"></div>
+      <div class="skel" id="skel">
+        <div class="sk-hdr"></div>
+        <div class="sk-ln"></div><div class="sk-ln"></div><div class="sk-ln"></div>
+        <div class="sk-ln"></div><div class="sk-ln"></div>
       </div>
-
-      <!-- Actual answer -->
-      <div class="answer-content" id="answerContent">
-        <div class="answer-question" id="answerQuestion"></div>
-        <div class="answer-main" id="answerMain"></div>
-        <div id="answerCode"></div>
-        <div class="followups-section" id="followupsSection" style="display:none;">
-          <div class="followups-label">💬 Follow-up questions you can ask</div>
-          <div id="followupsChips"></div>
+      <div class="ans-cont" id="ansCont">
+        <div class="ans-q-tag"><span class="ans-q-ico">❓</span><span class="ans-q-txt" id="ansQTxt"></span></div>
+        <div class="ans-body" id="ansBody"></div>
+        <div id="ansCode"></div>
+        <div class="fu-sec" id="fuSec" style="display:none">
+          <div class="fu-lbl"><span class="fu-dot"></span>Ask the interviewer back</div>
+          <div class="fu-chips" id="fuChips"></div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- MIC BUTTON -->
-  <div class="mic-container">
+  <!-- MANUAL -->
+  <div class="man-row">
+    <input class="man-in" id="manIn" type="text" placeholder="Or type question here…" autocomplete="off"/>
+    <div class="man-send" id="manSend">→</div>
+  </div>
+
+  <!-- MIC -->
+  <div class="mic-area">
     <button class="mic-btn idle" id="micBtn">
-      <span class="mic-icon">🎤</span>
-      <span id="micLabel">Hold to Listen</span>
+      <span class="mic-ico" id="micIco">🎤</span>
+      <span id="micLbl">Tap to Listen</span>
     </button>
-    <div class="clear-btn" id="clearBtn" title="Clear">🗑</div>
-  </div>
-
-</div>
-
-<!-- SETTINGS SHEET -->
-<div class="settings-overlay" id="settingsOverlay">
-  <div class="settings-sheet">
-    <div class="settings-handle"></div>
-    <div class="settings-title">Settings</div>
-
-    <div class="setting-row">
-      <div class="setting-info">
-        <label>Auto-detect questions</label>
-        <small>Send to AI when question mark detected</small>
-      </div>
-      <div class="toggle on" id="toggleAutoDetect"></div>
-    </div>
-
-    <div class="setting-row">
-      <div class="setting-info">
-        <label>Language</label>
-        <small>Speech recognition language</small>
-      </div>
-      <select class="select-field" id="langSelect">
-        <option value="en-US">English (US)</option>
-        <option value="en-GB">English (UK)</option>
-        <option value="en-ZA">English (ZA)</option>
-        <option value="af-ZA">Afrikaans</option>
-        <option value="fr-FR">French</option>
-        <option value="de-DE">German</option>
-        <option value="es-ES">Spanish</option>
-        <option value="pt-BR">Portuguese</option>
-        <option value="zh-CN">Chinese</option>
-        <option value="ar-SA">Arabic</option>
-      </select>
-    </div>
-
-    <div class="setting-row">
-      <div class="setting-info">
-        <label>Answer depth</label>
-        <small>How detailed the AI response should be</small>
-      </div>
-      <select class="select-field" id="depthSelect">
-        <option value="concise">Concise</option>
-        <option value="detailed" selected>Detailed</option>
-        <option value="expert">Expert</option>
-      </select>
-    </div>
-
-    <div class="setting-row">
-      <div class="setting-info">
-        <label>Show code examples</label>
-        <small>For technical & coding questions</small>
-      </div>
-      <div class="toggle on" id="toggleCode"></div>
-    </div>
-
-    <div class="setting-row">
-      <div class="setting-info">
-        <label>Show follow-up questions</label>
-        <small>Questions to ask the interviewer back</small>
-      </div>
-      <div class="toggle on" id="toggleFollowups"></div>
-    </div>
-
-    <br>
-    <button class="btn-save" style="width:100%; height:44px; border-radius:10px;" 
-            onclick="document.getElementById('settingsOverlay').classList.remove('open')">
-      Done
-    </button>
+    <div class="clr-btn" id="clrBtn">🗑</div>
   </div>
 </div>
 
-<!-- TOAST -->
+<!-- SETTINGS -->
+<div class="overlay" id="settingsOv">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title">Settings</div>
+    <div class="s-row"><div class="s-info"><label>Auto-detect questions</label><small>Trigger on question words / ?</small></div><div class="tog on" id="tAuto"></div></div>
+    <div class="s-row"><div class="s-info"><label>Show code examples</label><small>For technical questions</small></div><div class="tog on" id="tCode"></div></div>
+    <div class="s-row"><div class="s-info"><label>Follow-up questions</label><small>Questions you can ask back</small></div><div class="tog on" id="tFu"></div></div>
+    <div class="s-row"><div class="s-info"><label>Language</label><small>Speech recognition</small></div>
+      <select class="sel" id="langSel"><option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="en-ZA">English (ZA)</option><option value="af-ZA">Afrikaans</option><option value="fr-FR">French</option><option value="de-DE">German</option><option value="es-ES">Spanish</option><option value="pt-BR">Portuguese</option><option value="ar-SA">Arabic</option></select>
+    </div>
+    <div class="s-row"><div class="s-info"><label>Answer depth</label><small>Detail level of responses</small></div>
+      <select class="sel" id="depthSel"><option value="concise">Concise</option><option value="detailed" selected>Detailed</option><option value="expert">Expert</option></select>
+    </div>
+    <button class="done-btn" id="doneBtn">Done ✓</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-// ============================================================
-//  InterviewAI — Core Logic
-// ============================================================
-
+// ════════════════════════════════════════════════
+//  INTERVIEWAI — FULLY DEBUGGED v2
+// ════════════════════════════════════════════════
 const $ = id => document.getElementById(id);
 
-// --- State ---
-let recognition = null;
-let isListening = false;
-let finalTranscript = '';
-let interimTranscript = '';
-let jobContext = '';
-let autoDetect = true;
-let showCode = true;
-let showFollowups = true;
-let answerDepth = 'detailed';
-let lang = 'en-US';
-let questionBuffer = '';
-let questionTimer = null;
-let waveInterval = null;
+// State
+let recog=null, listening=false, isThinking=false;
+let finalTx='', jobCtx='';
+let autoDetect=true, wantCode=true, wantFu=true;
+let depth='detailed', lang='en-US';
+let qBuf='', qTimer=null, waveTimer=null;
 
-// --- Init waveform bars ---
-const waveform = $('waveform');
-const BAR_COUNT = 28;
-for (let i = 0; i < BAR_COUNT; i++) {
-  const bar = document.createElement('div');
-  bar.className = 'wave-bar';
-  bar.id = `wb${i}`;
-  waveform.appendChild(bar);
+// Build waveform
+const waveEl = $('waveEl');
+for(let i=0;i<32;i++){const b=document.createElement('div');b.className='wb';b.id='wb'+i;waveEl.appendChild(b);}
+
+// Toggles
+function mkTog(id,cb){
+  const el=$(id);
+  el.addEventListener('click',()=>{el.classList.toggle('on');cb(el.classList.contains('on'));});
+}
+mkTog('tAuto',v=>autoDetect=v);
+mkTog('tCode',v=>wantCode=v);
+mkTog('tFu',v=>wantFu=v);
+
+$('langSel').addEventListener('change',e=>{lang=e.target.value;if(listening)reboot();});
+$('depthSel').addEventListener('change',e=>depth=e.target.value);
+$('settingsBtn').addEventListener('click',()=>$('settingsOv').classList.add('open'));
+$('settingsOv').addEventListener('click',e=>{if(e.target===$('settingsOv'))$('settingsOv').classList.remove('open');});
+$('doneBtn').addEventListener('click',()=>$('settingsOv').classList.remove('open'));
+
+$('saveCtx').addEventListener('click',()=>{
+  jobCtx=$('jobIn').value.trim();
+  toast(jobCtx?'✓ Context saved':'Context cleared');
+});
+$('clrBtn').addEventListener('click',()=>{
+  finalTx='';qBuf='';clearTimeout(qTimer);
+  resetTx();hideAns();toast('Cleared');
+});
+$('micBtn').addEventListener('click',()=>{if(!isThinking){listening?stopListen():startListen();}});
+$('manSend').addEventListener('click',sendManual);
+$('manIn').addEventListener('keydown',e=>{if(e.key==='Enter')sendManual();});
+
+function sendManual(){
+  const q=$('manIn').value.trim();
+  if(!q)return;
+  $('manIn').value='';
+  updateTx(q);
+  getAnswer(q);
 }
 
-// --- Settings toggles ---
-function initToggle(id, onCallback) {
-  const el = $(id);
-  el.addEventListener('click', () => {
-    el.classList.toggle('on');
-    onCallback(el.classList.contains('on'));
-  });
-}
-
-initToggle('toggleAutoDetect', v => autoDetect = v);
-initToggle('toggleCode', v => showCode = v);
-initToggle('toggleFollowups', v => showFollowups = v);
-
-$('langSelect').addEventListener('change', e => {
-  lang = e.target.value;
-  if (isListening) restartRecognition();
-});
-
-$('depthSelect').addEventListener('change', e => answerDepth = e.target.value);
-$('settingsBtn').addEventListener('click', () => $('settingsOverlay').classList.add('open'));
-$('settingsOverlay').addEventListener('click', e => {
-  if (e.target === $('settingsOverlay')) $('settingsOverlay').classList.remove('open');
-});
-
-// --- Job context ---
-$('saveContext').addEventListener('click', () => {
-  jobContext = $('jobContext').value.trim();
-  showToast(jobContext ? `Context saved ✓` : 'Context cleared');
-});
-
-// --- Clear ---
-$('clearBtn').addEventListener('click', () => {
-  finalTranscript = '';
-  interimTranscript = '';
-  questionBuffer = '';
-  clearTimeout(questionTimer);
-  resetTranscript();
-  hideAnswer();
-  showToast('Cleared');
-});
-
-// --- Mic Button (tap to toggle) ---
-$('micBtn').addEventListener('click', () => {
-  if (isListening) stopListening();
-  else startListening();
-});
-
-// ============================================================
-//  Speech Recognition
-// ============================================================
-function buildRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    showToast('Speech not supported. Use Chrome.');
-    return null;
-  }
-  const r = new SR();
-  r.continuous = true;
-  r.interimResults = true;
-  r.lang = lang;
-  r.maxAlternatives = 1;
-
-  r.onstart = () => {
-    isListening = true;
-    updateMicUI(true);
-    startWave();
-  };
-
-  r.onresult = (e) => {
-    interimTranscript = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) {
-        finalTranscript += t + ' ';
-        handleNewText(t);
-      } else {
-        interimTranscript = t;
-      }
+// ════════════════════════════════════════════════
+//  SPEECH RECOGNITION
+// ════════════════════════════════════════════════
+function buildRecog(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Use Chrome for mic support');return null;}
+  const r=new SR();
+  r.continuous=true;r.interimResults=true;r.lang=lang;r.maxAlternatives=1;
+  r.onstart=()=>{listening=true;micUI('rec');setPill('on','● Listening');startWave();};
+  r.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal){finalTx+=t+' ';onText(t);}
+      else interim=t;
     }
-    updateTranscriptUI(finalTranscript + interimTranscript);
+    updateTx(finalTx+interim);
   };
-
-  r.onerror = (e) => {
-    if (e.error === 'no-speech') return;
-    if (e.error === 'not-allowed') {
-      showToast('Mic permission denied. Allow in browser.');
-      stopListening(); return;
-    }
-    if (e.error === 'network') { showToast('Network error. Check connection.'); return; }
-    console.warn('SR error:', e.error);
+  r.onerror=e=>{
+    if(e.error==='no-speech')return;
+    if(e.error==='not-allowed'){toast('Mic denied — allow in Chrome settings');stopListen();return;}
+    console.warn('SR:',e.error);
   };
-
-  r.onend = () => {
-    if (isListening) {
-      // Auto-restart to keep continuous
-      try { r.start(); } catch(e) {}
-    } else {
-      updateMicUI(false);
-      stopWave();
-    }
+  r.onend=()=>{
+    if(listening){try{r.start();}catch(e){}}
+    else{micUI('idle');setPill('','Ready');stopWave();}
   };
-
   return r;
 }
+function startListen(){recog=buildRecog();if(!recog)return;try{recog.start();}catch(e){toast('Cannot access mic');}}
+function stopListen(){listening=false;if(recog)try{recog.stop();}catch(e){}micUI('idle');setPill('','Ready');stopWave();}
+function reboot(){if(recog)try{recog.stop();}catch(e){}setTimeout(()=>{if(listening){recog=buildRecog();try{recog.start();}catch(e){}}},400);}
 
-function startListening() {
-  recognition = buildRecognition();
-  if (!recognition) return;
-  try {
-    recognition.start();
-  } catch(e) {
-    showToast('Could not start mic');
-  }
-}
+// ════════════════════════════════════════════════
+//  QUESTION DETECTION
+// ════════════════════════════════════════════════
+const Q_RE=/\b(tell me|tell us|describe|explain|how would|what is|what are|what was|what were|why did|why do|why would|can you|could you|have you|walk me through|what do you|how do you|give me an example|what experience|what.s your|what are your|which would|define|compare|difference between|how have you|talk about|share an example|what would you|when have you|why are you|why should we|what motivates|strengths|weaknesses|where do you see|how did you|what challenges)\b/i;
 
-function stopListening() {
-  isListening = false;
-  if (recognition) {
-    try { recognition.stop(); } catch(e) {}
-  }
-  updateMicUI(false);
-  stopWave();
-}
-
-function restartRecognition() {
-  if (recognition) { try { recognition.stop(); } catch(e) {} }
-  setTimeout(() => { if (isListening) { recognition = buildRecognition(); try { recognition.start(); } catch(e) {} } }, 300);
-}
-
-// ============================================================
-//  Question Detection
-// ============================================================
-function handleNewText(text) {
-  questionBuffer += text + ' ';
-
-  if (!autoDetect) return;
-
-  // Detect question: ends with ?, or question keywords
-  const isQuestion = /\?/.test(text) || 
-    /\b(tell me|describe|explain|how would|what is|what are|why did|can you|could you|have you|walk me through|what do you|how do you|give me|what experience|what's your|what was|what were|which would|define|compare|difference between)\b/i.test(text);
-
-  if (isQuestion) {
-    clearTimeout(questionTimer);
-    const q = questionBuffer.trim();
-    questionBuffer = '';
-    triggerAnswer(q);
+function onText(text){
+  qBuf+=text+' ';
+  if(!autoDetect)return;
+  if(/\?/.test(text)||Q_RE.test(text)){
+    clearTimeout(qTimer);
+    // Small delay to collect full sentence
+    qTimer=setTimeout(fireQ,1200);
   } else {
-    // Also trigger after 3s pause if there's content
-    clearTimeout(questionTimer);
-    questionTimer = setTimeout(() => {
-      if (questionBuffer.trim().length > 20) {
-        const q = questionBuffer.trim();
-        questionBuffer = '';
-        triggerAnswer(q);
-      }
-    }, 3500);
+    clearTimeout(qTimer);
+    if(qBuf.trim().split(/\s+/).length>8){
+      qTimer=setTimeout(fireQ,4500);
+    }
   }
 }
-
-// ============================================================
-//  AI Answer via Pollinations (FREE, no API key)
-// ============================================================
-async function triggerAnswer(question) {
-  if (!question || question.length < 5) return;
-
-  setStatus('thinking');
-  showSkeleton();
-
-  const context = jobContext ? `Role/Context: ${jobContext}\n\n` : '';
-  const depthNote = answerDepth === 'concise' 
-    ? 'Be concise, 3-5 sentences max.'
-    : answerDepth === 'expert'
-    ? 'Give an expert-level, thorough answer with technical depth.'
-    : 'Give a detailed, well-structured answer suitable for a job interview.';
-
-  const codeNote = showCode 
-    ? 'If the question is technical or about coding, include a short code example in a code block using triple backticks with language label.'
-    : 'Do not include code examples.';
-
-  const followupNote = showFollowups
-    ? 'At the end, add a section "FOLLOWUPS:" with 2-3 smart follow-up questions the candidate could ask the interviewer, each on its own line starting with "-".'
-    : '';
-
-  const prompt = `You are an expert interview coach helping a job candidate answer interview questions in real-time.
-
-${context}Interview question: "${question}"
-
-Instructions:
-- ${depthNote}
-- Start directly with the answer, no preamble.
-- ${codeNote}
-- Structure your answer clearly.
-- ${followupNote}
-
-Answer:`;
-
-  try {
-    const model = 'openai-large';
-    const encodedPrompt = encodeURIComponent(prompt);
-    const url = `https://text.pollinations.ai/${encodedPrompt}?model=${model}&seed=${Date.now()}`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('API error');
-    const text = await res.text();
-    renderAnswer(question, text.trim());
-    setStatus('listening');
-  } catch (err) {
-    console.error(err);
-    showToast('AI error — check connection');
-    hideSkeleton();
-    setStatus('listening');
-  }
+function fireQ(){
+  const q=qBuf.trim();qBuf='';
+  if(q.length<6)return;
+  getAnswer(q);
 }
 
-// ============================================================
-//  Render Answer
-// ============================================================
-function renderAnswer(question, rawText) {
-  hideSkeleton();
+// ════════════════════════════════════════════════
+//  AI ANSWER — Pollinations AI (100% Free)
+//  BUG FIX: Using proper POST + JSON parse logic
+// ════════════════════════════════════════════════
+async function getAnswer(question){
+  if(isThinking)return;
+  isThinking=true;
+  setPill('thinking','◌ Thinking…');
+  micUI('busy');
+  showSkel();
 
-  // Parse code blocks
-  const codeBlocks = [];
-  let mainText = rawText.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, lang, code) => {
-    codeBlocks.push({ lang: lang || 'code', code: code.trim() });
-    return `[[CODE_${codeBlocks.length - 1}]]`;
-  });
+  const depthMap={concise:'Be concise — max 4 sentences.',detailed:'Give a well-structured, detailed answer with examples.',expert:'Give an expert-level, technically deep answer with real examples.'};
+  const codeNote=wantCode?'If coding/technical, include a code example using ```language``` code blocks.':'No code examples.';
+  const fuNote=wantFu?'After your answer, write:\nFOLLOWUPS:\n- [smart follow-up question 1]\n- [smart follow-up question 2]\n- [smart follow-up question 3]':'';
+  const ctxNote=jobCtx?`The candidate is interviewing for: ${jobCtx}`:'General job interview context.';
 
-  // Parse follow-ups
-  let followups = [];
-  if (showFollowups) {
-    const followupMatch = mainText.match(/FOLLOWUPS?:\s*([\s\S]+?)$/im);
-    if (followupMatch) {
-      mainText = mainText.replace(followupMatch[0], '').trim();
-      followups = followupMatch[1]
-        .split('\n')
-        .map(l => l.replace(/^[-•*]\s*/, '').trim())
-        .filter(l => l.length > 5);
+  const system=`You are an elite interview coach helping a candidate in a LIVE interview right now. Give the answer directly — no preamble like "Certainly!" or "Great question!". Just the answer, professional and confident.
+
+${ctxNote}
+${depthMap[depth]}
+${codeNote}
+${fuNote}`;
+
+  const userMsg=`Interview question: "${question}"`;
+
+  // ── Attempt 1: Pollinations OpenAI-compatible POST ──
+  let answer='';
+  try{
+    const res=await fetch('https://text.pollinations.ai/openai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'openai-large',
+        messages:[{role:'system',content:system},{role:'user',content:userMsg}],
+        temperature:0.7,
+        seed:Math.floor(Math.random()*9999),
+        private:true
+      })
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const raw=await res.text();
+    // Handle both raw text and JSON responses
+    try{
+      const j=JSON.parse(raw);
+      answer=j?.choices?.[0]?.message?.content || j?.choices?.[0]?.text || j?.content || j?.text || '';
+    }catch{
+      answer=raw; // raw text response
+    }
+    if(!answer||answer.trim().length<10)throw new Error('Empty');
+  }catch(e1){
+    console.warn('API attempt 1 failed:',e1.message);
+    // ── Attempt 2: GET endpoint (shorter prompt) ──
+    try{
+      const p=encodeURIComponent(`Answer this interview question as an expert coach. Be direct, professional, no preamble.\n\nContext: ${jobCtx||'general job interview'}\nDepth: ${depth}\n\nQuestion: "${question}"\n\n${wantCode?'Include code examples if technical.':''}\n${wantFu?'End with:\nFOLLOWUPS:\n- question1\n- question2\n- question3':''}`);
+      const res2=await fetch(`https://text.pollinations.ai/${p}?model=openai-large&seed=${Math.floor(Math.random()*9999)}`,{signal:AbortSignal.timeout(15000)});
+      if(!res2.ok)throw new Error('HTTP '+res2.status);
+      answer=await res2.text();
+      if(!answer||answer.trim().length<10)throw new Error('Empty fallback');
+    }catch(e2){
+      console.warn('API attempt 2 failed:',e2.message);
+      answer=offlineAnswer(question);
+      toast('⚠️ Offline mode — check connection');
     }
   }
 
-  // Render question
-  $('answerQuestion').textContent = `Q: ${question.substring(0, 100)}${question.length > 100 ? '…' : ''}`;
+  renderAnswer(question,answer.trim());
+  setPill(listening?'on':'','');
+  if(listening)setPill('on','● Listening');
+  else setPill('','Ready');
+  micUI(listening?'rec':'idle');
+  isThinking=false;
+}
 
-  // Render main text with code placeholders
-  const parts = mainText.split(/(\[\[CODE_\d+\]\])/);
-  let mainHTML = '';
-  parts.forEach(part => {
-    const codeMatch = part.match(/\[\[CODE_(\d+)\]\]/);
-    if (codeMatch) {
-      const idx = parseInt(codeMatch[1]);
-      const { lang, code } = codeBlocks[idx];
-      mainHTML += `<div class="code-block">
-        <div class="code-block-label">
-          <span>${lang.toUpperCase()}</span>
-          <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-        </div>
-        <pre>${escapeHTML(code)}</pre>
-      </div>`;
-    } else if (part.trim()) {
-      const lines = part.trim().split('\n').filter(l => l.trim());
-      lines.forEach(line => {
-        mainHTML += `<p>${escapeHTML(line)}</p>`;
-      });
+// ── Offline smart fallback ──
+function offlineAnswer(q){
+  const l=q.toLowerCase();
+  if(/strength/i.test(l))return`My key strength is breaking complex problems into clear, actionable steps and communicating solutions effectively to both technical and non-technical stakeholders.\n\nIn my previous role, I identified a process bottleneck that was slowing delivery by 35% and led the initiative to redesign it, cutting the timeline significantly.\n\nI combine analytical thinking with strong collaboration, which means I deliver results without working in isolation.\n\nFOLLOWUPS:\n- What does success look like in this role after 90 days?\n- What are the biggest challenges the team is currently facing?\n- How does leadership support growth here?`;
+  if(/weakness/i.test(l))return`I have a tendency to be overly thorough, which can slow me down. I've actively worked on this by setting time-boxes for tasks and learning when "good enough" is the right standard versus when excellence is required.\n\nThe improvement has been meaningful — I now balance quality with velocity much better, and I regularly deliver on time.\n\nFOLLOWUPS:\n- How does the team handle competing priorities and deadlines?\n- What tools do you use for project management here?\n- How do you support work-life balance?`;
+  if(/tell me about yourself/i.test(l))return`I'm a results-driven professional with a strong background in my field, combining technical skills with strategic thinking. I've consistently delivered high-impact results by focusing on what matters most to the business.\n\nI'm drawn to this role because it aligns with my expertise and offers the growth I'm looking for. I thrive in collaborative, fast-moving environments where I can make a tangible difference.\n\nFOLLOWUPS:\n- What does the first 30 days look like for someone joining this team?\n- What are the top priorities for this role right now?\n- How would you describe the team culture?`;
+  if(/why.*company|why.*role|why.*us|why.*here/i.test(l))return`I've been following your company's work closely and I'm genuinely excited by your approach and the impact you're creating. What draws me specifically is the opportunity to contribute meaningfully to [relevant mission] while continuing to develop professionally.\n\nThe values I see reflected in how your team operates — collaboration, innovation, and ownership — are exactly what I look for in a workplace.\n\nFOLLOWUPS:\n- What sets your top performers apart here?\n- How does leadership communicate vision to the team?\n- What's the biggest strategic priority for this year?`;
+  return`My approach starts with fully understanding the problem before jumping to a solution. I ask clarifying questions, gather context, and then structure my thinking methodically.\n\nI'd apply my experience in [relevant domain] to address this — first by [action 1], then [action 2], and measuring success by [metric]. I've used this approach in similar situations and it consistently delivers strong results while keeping all stakeholders aligned.\n\nFOLLOWUPS:\n- Can you tell me more about the team I'd be collaborating with?\n- What does a typical week look like in this role?\n- How does the company measure performance?`;
+}
+
+// ════════════════════════════════════════════════
+//  RENDER ANSWER
+// ════════════════════════════════════════════════
+function renderAnswer(question,raw){
+  hideSkel();
+  // Extract code blocks
+  const codes=[];
+  let txt=raw.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{codes.push({lang:lang||'code',code:code.trim()});return`⌁CODE${codes.length-1}⌁`;});
+  // Extract follow-ups
+  let fus=[];
+  const fuM=txt.match(/FOLLOWUPS?:?\s*([\s\S]+?)$/im);
+  if(fuM){txt=txt.slice(0,txt.indexOf(fuM[0])).trim();fus=fuM[1].split('\n').map(l=>l.replace(/^[-•*\d.)]+\s*/,'').trim()).filter(l=>l.length>8&&l.length<220);}
+  // Q label
+  $('ansQTxt').textContent=question.length>85?question.slice(0,85)+'…':question;
+  // Body
+  const segs=txt.split(/(⌁CODE\d+⌁)/);
+  let html='';
+  segs.forEach(seg=>{
+    const m=seg.match(/⌁CODE(\d+)⌁/);
+    if(m){
+      const {lang,code}=codes[+m[1]];
+      html+=`<div class="code-blk"><div class="code-hdr"><span class="code-lang">${esc(lang)}</span><button class="code-copy" onclick="cpCode(this)">Copy</button></div><pre>${esc(code)}</pre></div>`;
+    } else {
+      seg.trim().split(/\n+/).filter(p=>p.trim()).forEach(p=>{html+=`<p>${esc(p)}</p>`;});
     }
   });
-
-  $('answerMain').innerHTML = mainHTML;
-  $('answerCode').innerHTML = '';
-
-  // Render follow-ups
-  if (followups.length && showFollowups) {
-    $('followupsSection').style.display = 'block';
-    const chips = followups.map(q =>
-      `<div class="followup-chip" onclick="copyToClipboard('${q.replace(/'/g,"\\'")}')">💬 ${escapeHTML(q)}</div>`
-    ).join('');
-    $('followupsChips').innerHTML = chips;
-  } else {
-    $('followupsSection').style.display = 'none';
-  }
-
-  $('answerEmpty').style.display = 'none';
-  $('answerContent').classList.add('visible');
-  $('answerBox').scrollTop = 0;
+  $('ansBody').innerHTML=html;
+  $('ansCode').innerHTML='';
+  // Follow-ups
+  if(fus.length&&wantFu){
+    $('fuSec').style.display='block';
+    $('fuChips').innerHTML=fus.map(q=>`<div class="fu-chip" onclick="cpTxt('${q.replace(/'/g,"\\'")}','${esc(q)}')">${esc(q)}</div>`).join('');
+  } else $('fuSec').style.display='none';
+  // Show — reset then trigger animation
+  const cont=$('ansCont');
+  $('ansEmpty').style.display='none';
+  cont.classList.remove('show');
+  cont.style.display='none';
+  void cont.offsetWidth; // force reflow
+  cont.style.display='block';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{cont.classList.add('show');$('ansBox').scrollTop=0;}));
 }
 
-function copyCode(btn) {
-  const code = btn.closest('.code-block').querySelector('pre').textContent;
-  navigator.clipboard.writeText(code).then(() => showToast('Code copied!')).catch(() => {});
+function cpCode(btn){const c=btn.closest('.code-blk').querySelector('pre').textContent;navigator.clipboard.writeText(c).then(()=>toast('Code copied ✓')).catch(()=>toast('Long-press to copy'));}
+function cpTxt(raw,display){navigator.clipboard.writeText(raw).then(()=>toast('Copied ✓')).catch(()=>toast('Long-press to copy'));}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════
+function micUI(state){
+  const b=$('micBtn'),l=$('micLbl'),i=$('micIco');
+  b.className='mic-btn '+state;
+  if(state==='rec'){l.textContent='Tap to Stop';i.textContent='⏹';}
+  else if(state==='busy'){l.textContent='Getting answer…';i.textContent='🧠';}
+  else{l.textContent='Tap to Listen';i.textContent='🎤';}
+}
+function setPill(type,text){
+  const p=$('pill');
+  p.className='pill'+(type?' '+type:'');
+  if(text)$('pillTxt').textContent=text;
+}
+function updateTx(text){
+  if(!text.trim()){resetTx();return;}
+  $('txPh').style.display='none';
+  const l=$('txLive');l.style.display='inline';
+  l.innerHTML=esc(text)+'<span class="cur"></span>';
+  const b=$('txBox');b.scrollTop=b.scrollHeight;
+}
+function resetTx(){$('txPh').style.display='';const l=$('txLive');l.style.display='none';l.innerHTML='';}
+function showSkel(){$('ansEmpty').style.display='none';$('ansCont').style.display='none';$('ansCont').classList.remove('show');$('skel').classList.add('show');}
+function hideSkel(){$('skel').classList.remove('show');}
+function hideAns(){$('ansCont').style.display='none';$('ansCont').classList.remove('show');$('ansEmpty').style.display='flex';hideSkel();}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+// ════════════════════════════════════════════════
+//  WAVEFORM
+// ════════════════════════════════════════════════
+function startWave(){
+  waveEl.classList.add('live');
+  waveTimer=setInterval(()=>{for(let i=0;i<32;i++){const b=$('wb'+i);if(b)b.style.height=(2+Math.random()*22)+'px';}},85);
+}
+function stopWave(){
+  clearInterval(waveTimer);waveEl.classList.remove('live');
+  for(let i=0;i<32;i++){const b=$('wb'+i);if(b)b.style.height='3px';}
 }
 
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => showToast('Copied!')).catch(() => {});
-}
-
-function escapeHTML(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ============================================================
-//  UI Helpers
-// ============================================================
-function updateMicUI(recording) {
-  const btn = $('micBtn');
-  const label = $('micLabel');
-  if (recording) {
-    btn.className = 'mic-btn recording';
-    label.textContent = 'Tap to Stop';
-    setStatus('listening');
-  } else {
-    btn.className = 'mic-btn idle';
-    label.textContent = 'Hold to Listen';
-    setStatus('ready');
-  }
-}
-
-function setStatus(s) {
-  const badge = $('statusBadge');
-  badge.className = 'status-badge';
-  if (s === 'listening') { badge.className += ' listening'; badge.textContent = '● LISTENING'; }
-  else if (s === 'thinking') { badge.className += ' thinking'; badge.textContent = '◌ THINKING'; }
-  else { badge.textContent = 'READY'; }
-}
-
-function updateTranscriptUI(text) {
-  if (!text.trim()) { resetTranscript(); return; }
-  $('transcriptPlaceholder').style.display = 'none';
-  const live = $('transcriptLive');
-  live.style.display = 'inline';
-  live.innerHTML = escapeHTML(text) + '<span class="cursor"></span>';
-  const box = $('transcriptBox');
-  box.scrollTop = box.scrollHeight;
-}
-
-function resetTranscript() {
-  $('transcriptPlaceholder').style.display = '';
-  const live = $('transcriptLive');
-  live.style.display = 'none';
-  live.textContent = '';
-}
-
-function showSkeleton() {
-  $('answerEmpty').style.display = 'none';
-  $('answerContent').classList.remove('visible');
-  $('skeletonWrap').classList.add('visible');
-}
-
-function hideSkeleton() {
-  $('skeletonWrap').classList.remove('visible');
-}
-
-function hideAnswer() {
-  $('answerContent').classList.remove('visible');
-  $('answerEmpty').style.display = 'flex';
-  hideSkeleton();
-}
-
-function showToast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
-}
-
-// ============================================================
-//  Waveform Animation
-// ============================================================
-function startWave() {
-  waveform.classList.add('active');
-  waveInterval = setInterval(() => {
-    for (let i = 0; i < BAR_COUNT; i++) {
-      const bar = $(`wb${i}`);
-      if (bar) {
-        const h = 2 + Math.random() * 26;
-        bar.style.height = h + 'px';
-      }
-    }
-  }, 80);
-}
-
-function stopWave() {
-  clearInterval(waveInterval);
-  waveform.classList.remove('active');
-  for (let i = 0; i < BAR_COUNT; i++) {
-    const bar = $(`wb${i}`);
-    if (bar) bar.style.height = '4px';
-  }
-}
-
-// ============================================================
-//  PWA / Service Worker
-// ============================================================
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
-
-console.log('%c InterviewAI Ready ', 'background:#00ff88; color:#000; font-weight:bold; padding:4px 8px; border-radius:4px;');
+console.log('%c InterviewAI v2 Ready ','background:#00e87a;color:#003320;font-weight:800;padding:4px 12px;border-radius:4px');
 </script>
 </body>
 </html>
